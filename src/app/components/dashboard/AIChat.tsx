@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Mic, Paperclip, Trash2, Copy, RotateCcw, MessageSquare, Sparkles } from 'lucide-react';
 import { FeatureShell } from './FeatureShell';
+import { getGeminiResponse } from '../../utils/gemini';
 
 interface Message {
   id: string;
@@ -22,7 +23,7 @@ export function AIChat() {
     }
   }, [messages, isTyping]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const userMessage: Message = {
@@ -36,17 +37,20 @@ export function AIChat() {
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI response logic (but keep it focused on functionality)
-    setTimeout(() => {
+    try {
+      const response = await getGeminiResponse(input);
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `మీరు అడిగిన '${input}' గురించి నేను సమాచారాన్ని సేకరిస్తున్నాను. ఇది డెమో వెర్షన్ కాబట్టి పూర్తి స్థాయి సమాధానం ప్రస్తుతానికి అందుబాటులో లేదు.`,
+        content: response,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Chat Error:", error);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const suggestedQuestions = [
