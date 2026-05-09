@@ -1,115 +1,75 @@
-import { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { LanguageProvider } from "./context/LanguageContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Navbar } from "./components/Navbar";
-import { Hero } from "./components/Hero";
-import { Features } from "./components/Features";
-import { HowItWorks } from "./components/HowItWorks";
 import { Footer } from "./components/Footer";
-import { About } from "./components/About";
-import { FeaturesPage } from "./components/FeaturesPage";
-import { HowItWorksPage } from "./components/HowItWorksPage";
-import { GovernmentScheme } from "./components/features/GovernmentScheme";
-import { VoiceResponses } from "./components/features/VoiceResponses";
-import { ConversationalChat } from "./components/features/ConversationalChat";
-import { PDFUnderstanding } from "./components/features/PDFUnderstanding";
-import { DialectFriendly } from "./components/features/DialectFriendly";
-import { HospitalDocuments } from "./components/features/HospitalDocuments";
-import { AgricultureUpdates } from "./components/features/AgricultureUpdates";
-import { SaveHistory } from "./components/features/SaveHistory";
+import { Home } from "./pages/Home";
+import { Login } from "./pages/Login";
+import { Signup } from "./pages/Signup";
+import { Dashboard } from "./pages/Dashboard";
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
+function NavbarVisibilityWrapper() {
+  return (
+    <Routes>
+      <Route path="/dashboard" element={null} />
+      <Route path="*" element={<Navbar />} />
+    </Routes>
+  );
+}
 
 function AppContent() {
-  const [activeSection, setActiveSection] = useState("home");
-  const [activeFeature, setActiveFeature] = useState<string | null>(null);
-
-  // Smooth scroll to top on navigation
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [activeSection, activeFeature]);
-
-  const handleNavigate = (section: string) => {
-    setActiveSection(section);
-    setActiveFeature(null);
-  };
-
-  const handleFeatureClick = (featureId: string) => {
-    setActiveFeature(featureId);
-  };
-
-  const handleBackToFeatures = () => {
-    setActiveFeature(null);
-  };
-
-  // Render feature detail pages
-  const renderFeatureDetail = () => {
-    switch (activeFeature) {
-      case "government-scheme":
-        return <GovernmentScheme onBack={handleBackToFeatures} />;
-      case "voice-responses":
-        return <VoiceResponses onBack={handleBackToFeatures} />;
-      case "conversational-chat":
-        return <ConversationalChat onBack={handleBackToFeatures} />;
-      case "pdf-understanding":
-        return <PDFUnderstanding onBack={handleBackToFeatures} />;
-      case "dialect-friendly":
-        return <DialectFriendly onBack={handleBackToFeatures} />;
-      case "hospital-documents":
-        return <HospitalDocuments onBack={handleBackToFeatures} />;
-      case "agriculture-updates":
-        return <AgricultureUpdates onBack={handleBackToFeatures} />;
-      case "save-history":
-        return <SaveHistory onBack={handleBackToFeatures} />;
-      default:
-        return null;
-    }
-  };
-
-  // Render main content based on active section
-  const renderContent = () => {
-    if (activeFeature) {
-      return renderFeatureDetail();
-    }
-
-    switch (activeSection) {
-      case "home":
-        return (
-          <>
-            <Hero />
-            <Features />
-            <HowItWorks />
-          </>
-        );
-      case "about":
-        return <About />;
-      case "features":
-        return <FeaturesPage onFeatureClick={handleFeatureClick} />;
-      case "how-it-works":
-        return <HowItWorksPage />;
-      default:
-        return (
-          <>
-            <Hero />
-            <Features />
-            <HowItWorks />
-          </>
-        );
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#0a0a0a] dark text-white overflow-x-hidden">
-      <Navbar activeSection={activeSection} onNavigate={handleNavigate} />
-      <div className="pt-24">
-        {renderContent()}
-      </div>
-      <Footer />
+      <NavbarVisibilityWrapper />
+      <main>
+        <Routes>
+          <Route path="/" element={<div className="pt-24"><Home /></div>} />
+          <Route path="/login" element={<div className="pt-24"><Login /></div>} />
+          <Route path="/signup" element={<div className="pt-24"><Signup /></div>} />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+      {/* Footer is hidden on dashboard via custom logic or just shown everywhere */}
+      <FooterVisibilityWrapper />
     </div>
+  );
+}
+
+function FooterVisibilityWrapper() {
+  // We can't use useLocation here because we need to be inside Router
+  // But AppContent is inside Router
+  return (
+    <Routes>
+      <Route path="/dashboard" element={null} />
+      <Route path="*" element={<Footer />} />
+    </Routes>
   );
 }
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
+    <Router>
+      <LanguageProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </LanguageProvider>
+    </Router>
   );
 }
