@@ -1,24 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, Play, Pause, Square, Volume2, Save, Download, RotateCcw, Sparkles, Settings, Leaf, Sun, Wind, Droplets, TrendingUp, ArrowRight, ArrowUpRight } from 'lucide-react';
+import { Mic, Play, Pause, Volume2, Sparkles, Leaf, Wind, Droplets, TrendingUp, ArrowUpRight, Upload, Loader2 } from 'lucide-react';
 import { FeatureShell } from './FeatureShell';
+import { ttsApi } from '../../../services/ttsApi';
+import { sttApi } from '../../../services/sttApi';
 
 export function VoiceResponses() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [hasRecording, setHasRecording] = useState(false);
+  const [text, setText] = useState('');
+  const [transcript, setTranscript] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingError, setRecordingError] = useState('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
-  const toggleRecording = () => {
-    if (!isRecording) {
-      setIsRecording(true);
-      setHasRecording(false);
-      setTimeout(() => {
-        setIsRecording(false);
-        setHasRecording(true);
-      }, 4000);
-    } else {
+  const handleGenerateSpeech = async () => {
+    if (!text.trim()) return;
+    setIsGenerating(true);
+    
+    try {
+      const blob = await ttsApi.generateSpeech(text);
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+      setIsGenerating(false);
+    } catch (error) {
+      console.error('TTS Error:', error);
+      setIsGenerating(false);
+      alert('Failed to generate speech');
+    }
+  };
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
       setIsRecording(false);
-      setHasRecording(true);
+      return;
+    }
+
+    setRecordingError('');
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        mediaStream.getTracks().forEach(track => track.stop());
+        try {
+          const textValue = await sttApi.transcribeAudio(blob);
+          setTranscript(textValue);
+          setText(textValue);
+        } catch (error) {
+          console.error('Voice STT Error:', error);
+          setRecordingError('Could not transcribe your speech. Try again.');
+        }
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Mic permission error:', error);
+      setRecordingError('Microphone permission is required for voice input.');
     }
   };
 
@@ -28,100 +89,83 @@ export function VoiceResponses() {
       description="Experience the power of spoken Telugu. Our AI understands regional dialects and responds with a natural, human-like voice."
       icon={Mic}
     >
-      <div className="max-w-4xl mx-auto flex flex-col items-center justify-center space-y-16 py-10">
-        {/* Interaction Core */}
-        <div className="relative group">
-          <AnimatePresence>
+      <div className="max-w-4xl mx-auto space-y-12 py-10">
+        <div className="bg-[#121212] border border-white/10 rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <button
+              type="button"
+              onClick={toggleRecording}
+              className={`inline-flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${isRecording ? 'border-orange-500/50 bg-orange-500/10 text-orange-400' : 'border-white/10 bg-white/5 text-white hover:border-white/20'}`}
+            >
+              <Mic size={18} />
+              {isRecording ? 'Stop Recording' : 'Record Telugu Speech'}
+            </button>
             {isRecording && (
-              <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: [1, 2, 1.5], opacity: [0, 0.2, 0.1] }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                className="absolute inset-0 bg-orange-500 rounded-full blur-[60px]"
-              />
+              <div className="flex items-end gap-1 h-8">
+                {Array.from({ length: 10 }).map((_, index) => (
+                  <motion.span
+                    key={index}
+                    className="w-1 rounded-full bg-orange-500"
+                    animate={{ height: ['20%', '100%', '40%', '80%'] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: index * 0.08 }}
+                    style={{ height: '20%' }}
+                  />
+                ))}
+              </div>
             )}
-          </AnimatePresence>
-          
+          </div>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type Telugu text here to hear it..."
+            className="w-full bg-black/40 border border-white/5 rounded-2xl p-6 text-white text-lg min-h-[150px] focus:border-orange-500/30 transition-all outline-none resize-none"
+          />
+          {transcript && (
+            <div className="rounded-2xl border border-white/5 bg-white/5 p-4 text-sm text-gray-300">
+              <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-2">Transcript Preview</p>
+              <p>{transcript}</p>
+            </div>
+          )}
+          {recordingError && <p className="text-sm text-red-400">{recordingError}</p>}
           <button
-            onClick={toggleRecording}
-            className={`relative z-10 w-48 h-48 rounded-[3rem] flex items-center justify-center transition-all duration-500 shadow-2xl ${
-              isRecording 
-                ? 'bg-red-500 shadow-red-500/40 rotate-12' 
-                : 'bg-[#121212] border border-white/10 hover:border-orange-500/30 shadow-black'
-            }`}
+            onClick={handleGenerateSpeech}
+            disabled={!text.trim() || isGenerating}
+            className="w-full py-5 bg-orange-500 text-white font-black text-lg rounded-2xl shadow-xl shadow-orange-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30 flex items-center justify-center gap-3"
           >
-            {isRecording ? (
-              <Square size={40} className="text-white fill-current" />
-            ) : (
-              <Mic size={48} className={hasRecording ? "text-orange-500" : "text-white"} />
-            )}
+            {isGenerating ? <Loader2 className="animate-spin" /> : <Volume2 />}
+            {isGenerating ? "Generating Voice..." : "Generate Telugu Voice"}
           </button>
         </div>
 
-        <div className="text-center space-y-4">
-          <h3 className="text-3xl font-black text-white">
-            {isRecording ? "Processing spoken Telugu..." : hasRecording ? "Intelligence Captured" : "Tap to speak in Telugu"}
-          </h3>
-          <p className="text-gray-500 max-w-sm mx-auto font-medium leading-relaxed">
-            Our neural models are trained on diverse Telugu dialects for 99% recognition accuracy.
-          </p>
-        </div>
-
-        {/* Results Area */}
         <AnimatePresence>
-          {hasRecording && (
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }}
+          {audioUrl && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="w-full bg-[#121212] border border-white/5 rounded-[3rem] p-10 lg:p-14 space-y-12 shadow-2xl"
+              className="bg-[#181818] border border-white/5 rounded-[2rem] p-8 flex items-center gap-8 shadow-2xl"
             >
-              <div className="space-y-6">
-                <div className="flex justify-between items-center text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">
-                  <span>AI Voice Response</span>
-                  <span className="text-orange-500">Active Node</span>
-                </div>
-                <div className="flex items-center gap-8">
-                  <button 
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="w-20 h-20 rounded-3xl bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl"
-                  >
-                    {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
-                  </button>
-                  <div className="flex-1 space-y-4">
-                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: isPlaying ? "100%" : "0%" }}
-                        transition={{ duration: 4, ease: "linear" }}
-                        className="h-full bg-orange-500"
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] font-bold text-gray-500">
-                      <span>0:00</span>
-                      <span>0:04</span>
-                    </div>
-                  </div>
+              <button
+                onClick={togglePlay}
+                className="w-20 h-20 rounded-3xl bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl"
+              >
+                {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+              </button>
+              <div className="flex-1 space-y-2">
+                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Ready to Play</p>
+                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                  <motion.div
+                    animate={{ width: isPlaying ? "100%" : "0%" }}
+                    transition={{ duration: 5, ease: "linear" }}
+                    className="h-full bg-orange-500"
+                  />
                 </div>
               </div>
-
-              <div className="bg-white/5 rounded-[2rem] p-8 border border-white/5 space-y-4">
-                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
-                  <Sparkles size={12} /> Transcription
-                </p>
-                <p className="text-white text-2xl font-bold leading-relaxed">
-                  "ఖచ్చితంగా! మీ ప్రశ్నకి సమాధానం ఇది..."
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-4 pt-4">
-                <button className="flex-1 py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-black text-white uppercase tracking-widest transition-all flex items-center justify-center gap-2">
-                  <Download size={14} /> Download Audio
-                </button>
-                <button className="flex-1 py-4 bg-white text-black rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl hover:scale-105 active:scale-95">
-                  Save to Vault
-                </button>
-              </div>
+              <audio
+                ref={audioRef}
+                src={audioUrl}
+                onEnded={() => setIsPlaying(false)}
+                className="hidden"
+              />
             </motion.div>
           )}
         </AnimatePresence>

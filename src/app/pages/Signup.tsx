@@ -14,7 +14,7 @@ export function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { signup } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,16 +27,14 @@ export function Signup() {
       return;
     }
 
-    // Simulate API call
-    setTimeout(() => {
-      if (name && email && password) {
-        login(name, email);
-        navigate('/dashboard');
-      } else {
-        setError('Please fill in all fields');
-      }
+    try {
+      await signup(name, email, password);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to create account');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

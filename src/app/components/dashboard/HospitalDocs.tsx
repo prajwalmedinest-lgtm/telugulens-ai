@@ -1,32 +1,38 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Activity, Upload, AlertTriangle, Pill, Calendar, Clock, ArrowRight, Download, FileText, CheckCircle2 } from 'lucide-react';
+import { Activity, Upload, AlertTriangle, Pill, Clock, ArrowRight, Download, FileText, CheckCircle2, X, Loader2 } from 'lucide-react';
 import { FeatureShell } from './FeatureShell';
+import { hospitalApi } from '../../../services/hospitalApi';
 
 export function HospitalDocs() {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [report, setReport] = useState<any | null>(null);
 
-  const handleProcess = () => {
+  const handleProcess = async () => {
     if (!file) return;
     setIsProcessing(true);
-    setTimeout(() => {
+    
+    try {
+      const response = await hospitalApi.uploadDocument(file);
       setIsProcessing(false);
       setReport({
-        patient: "P. Raghava Rao",
-        doctor: "Dr. S. K. Murthy (Cardiology)",
-        date: "May 20, 2026",
-        diagnosis: "Mild Hypertension and Sinus Tachycardia",
-        diagnosisTe: "తేలికపాటి రక్తపోటు మరియు వేగవంతమైన గుండె కొట్టుకోవడం",
+        patient: "Patient (Detected)",
+        doctor: "Medical AI Analysis",
+        date: new Date().toLocaleDateString(),
+        diagnosis: response.medicalExplanation,
+        diagnosisTe: response.teluguExplanation,
         medications: [
-          { name: "Telmisartan 40mg", timing: "Once daily (Morning)", instruction: "ఆహారం తర్వాత తీసుకోండి", color: "orange" },
-          { name: "Metoprolol 25mg", timing: "Twice daily", instruction: "ఉదయం మరియు రాత్రి", color: "blue" }
+          { name: "Instructions found in report", timing: "See explanation", instruction: "రిపోర్ట్ చూడండి", color: "orange" }
         ],
-        followUp: "June 15, 2026",
-        warnings: ["Avoid heavy salt in diet", "Report chest pain immediately"]
+        followUp: "As per report",
+        warnings: [response.disclaimer]
       });
-    }, 2500);
+    } catch (error) {
+      console.error('Hospital Docs Error:', error);
+      setIsProcessing(false);
+      alert('Failed to analyze document. Please try again.');
+    }
   };
 
   return (
@@ -88,7 +94,7 @@ export function HospitalDocs() {
                       </div>
                       <div>
                         <p className="text-white font-bold truncate max-w-[200px]">{file.name}</p>
-                        <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Image File • Pending</p>
+                        <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">File • Ready</p>
                       </div>
                     </div>
                     <button onClick={() => setFile(null)} className="p-2 text-gray-600 hover:text-red-400 transition-colors">
@@ -198,4 +204,3 @@ export function HospitalDocs() {
     </FeatureShell>
   );
 }
-import { X, Loader2 } from 'lucide-react';

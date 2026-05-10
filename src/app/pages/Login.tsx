@@ -19,18 +19,14 @@ export function Login() {
     setIsLoading(true);
     setError('');
 
-    // Simulate API call
-    setTimeout(() => {
-      if (email && password) {
-        // In a real app, we'd verify with a backend
-        const name = email.split('@')[0];
-        login(name.charAt(0).toUpperCase() + name.slice(1), email);
-        navigate('/dashboard');
-      } else {
-        setError('Please fill in all fields');
-      }
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err?.message || 'Login failed');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
